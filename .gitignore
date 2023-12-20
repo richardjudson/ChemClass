@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+data/input/httr/
+data/input/SMILES/
+data/input saved 2023-09-05/
+data/input saved 2023-09-13/
+man/
+data/input/old/
+data/input/classyfire/
+data/input/drugs/
+data/input/deprecated/
