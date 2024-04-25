@@ -17,6 +17,10 @@ use.classes <- function() {
   print(file)
   expert = read.xlsx(file)
 
+  file = paste0(dir,"expert override.xlsx")
+  print(file)
+  expert.override = read.xlsx(file)
+
   x = drugs2[is.element(drugs2$dtxsid,pest0$dtxsid),]
   if(nrow(x)>0) {
     cat("overlaps between drug and pesticide\n")
@@ -72,9 +76,9 @@ use.classes <- function() {
   cat("biosolids",nrow(res),length(unique(res$dtxsid)),"\n")
 
   #-------------------------------------------------------------------
-  # Add the toxval chemicals in the TSCA QSAR model to the dataframe
+  # Add the toxval chemicals with PODs
   #-------------------------------------------------------------------
-  file = paste0(dir,"toxval pods chemical level oral mgkgday.xlsx")
+  file = paste0(dir,"toxval chemicals.xlsx")
   print(file)
   toxval = read.xlsx(file)
   toxval = unique(toxval[,c("dtxsid","name")])
@@ -154,64 +158,37 @@ use.classes <- function() {
   opppest$chosen_class = NA
   dlist.pest = unique(c(dlist.pest,opppest$dtxsid))
 
-
   #-------------------------------------------------------------------
   # Add the classyfire classifications
   #-------------------------------------------------------------------
+  cat("ClassyFire [1]\n")
   res$class_type = NA
   res$chosen_class = NA
-  if(!exists("ClassyFire")) {
-    file = paste0(dir,"classyfire/ClassyFire DSSTox.RData")
-    print(file)
-    load(file=file)
-    ClassyFire <<- ClassyFire
-    rownames(ClassyFire) = ClassyFire$dtxsid
-  }
-  clist = ClassyFire$dtxsid
-  res1 = res[is.element(res$dtxsid,clist),]
-  res1 = res1[order(res1$dtxsid),]
-  res2 = res[!is.element(res$dtxsid,clist),]
-  res = rbind(res1,res2)
-  c1 = ClassyFire[res1$dtxsid,c("dtxsid","kingdom","superclass","class","subclass")]
-  c1 = c1[order(res1$dtxsid),]
-  c2 = as.data.frame(matrix(nrow=nrow(res2),ncol=ncol(c1)))
-  names(c2) = names(c1)
-  c12= rbind(c1,c2)
-  res = cbind(res,c12)
-
-  file = paste0(dir,"classyfire extra chemicals.xlsx")
-  print(file)
-  cf2 = read.xlsx(file)
-  cf2 = unique(cf2)
-
-  # extra = cf2[!is.element(cf2$dtxsid,ClassyFire$dtxsid),]
-  # extra = extra[!is.na(extra$kingdom),]
-  # browser()
-  # file = paste0(dir,"ClassyFire classes not in new set.xlsx")
-  # write.xlsx(extra,file)
-
-  for(i in 1:nrow(res)) {
-    if(is.na(res[i,"kingdom"])) {
-      dtxsid = res[i,"dtxsid"]
-      if(is.element(dtxsid,cf2$dtxsid)) {
-        x = cf2[cf2$dtxsid==dtxsid,]
-        res[i,"kingdom"] = x[1,"kingdom"]
-        res[i,"superclass"] = x[1,"superclass"]
-        res[i,"class"] = x[1,"class"]
-        res[i,"subclass"] = x[1,"subclass"]
-      }
-    }
-  }
+  file = paste0(dir,"chemclass classyfire.xlsx")
+  classyfire = read.xlsx(file)
+  classyfire = classyfire[classyfire$success==1,]
+  classyfire$class_type = NA
+  classyfire$chosen_class = NA
+  nlist = c("dtxsid","name","class_type","chosen_class","kingdom","superclass","class","subclass")
+  classyfire = classyfire[,nlist]
+  res2 = res[!is.element(res$dtxsid,classyfire$dtxsid),]
+  res2$kingdom = NA
+  res2$superclass = NA
+  res2$class = NA
+  res2$subclass = NA
+  #browser()
+  res0 = res
+  res = rbind(classyfire,res2)
 
   #-------------------------------------------------------------------
   # Add extra columns to the dataframe
   #-------------------------------------------------------------------
   res$thyroid = NA
-  res$tsca = NA
+  res$toxvaldb = NA
   res$pesticide = NA
   res$httr = NA
   res[is.element(res$dtxsid,dlist.thyroid),"thyroid"] = 1
-  res[is.element(res$dtxsid,dlist.tsca),"tsca"] = 1
+  res[is.element(res$dtxsid,dlist.tsca),"toxvaldb"] = 1
   res[is.element(res$dtxsid,dlist.httr),"httr"] = 1
   res[is.element(res$dtxsid,dlist.pest),"pesticide"] = 1
 
@@ -224,13 +201,23 @@ use.classes <- function() {
   res$httr_use_class = NA
   res$color = NA
   res$metal = NA
-  res = unique(res)
-  res = res[!is.na(res$name),]
-  res[res$dtxsid=="DTXSID2034702","name"] = "MCPB-sodium"
-  res = unique(res)
+  #res = res[!is.na(res$name),]
+  #res[res$dtxsid=="DTXSID2034702","name"] = "MCPB-sodium"
+  # res = unique(res)
+  res2 = res
+  res2$name = NA
+  res2 = unique(res2)
 
+  rownames(res2) = res2$dtxsid
+  dlist = res2$dtxsid
+  for(i in 1:nrow(res2)) {
+    dtxsid = res2[i,"dtxsid"]
+    nlist = res[is.element(res$dtxsid,dtxsid),"name"]
+    res2[i,"name"] = nlist[1]
+  }
+  res = res2
+  res = unique(res)
   rownames(res) = res$dtxsid
-
   #-------------------------------------------------------------------
   # Add the httr use class
   #-------------------------------------------------------------------
@@ -296,7 +283,6 @@ use.classes <- function() {
     res[dtxsid,"pesticide"] = "1"
   }
 
-
   #-------------------------------------------------------------------------
   # add the color
   #-------------------------------------------------------------------------
@@ -310,24 +296,7 @@ use.classes <- function() {
     res[dtxsid,"color"] = color
   }
 
-  #-------------------------------------------------------------------------
-  # add the metals
-  #-------------------------------------------------------------------------
-  # file = paste0(dir,"metals.xlsx")
-  # print(file)
-  # metals = read.xlsx(file)
-  # metals = metals[is.element(metals$dtxsid,res$dtxsid),]
-  # res[is.element(res$dtxsid,metals$dtxsid),"metal"] = 1
-  # for(i in 1:nrow(metals)) {
-  #   dtxsid = metals[i,"dtxsid"]
-  #   metal = metals[i,"metal"]
-  #   class = res[dtxsid,"class_type"]
-  #   name = res[dtxsid,"name"]
-  #   res[dtxsid,"class_type"] = "Organometallic"
-  #   res[dtxsid,"chosen_class"] = paste("Organometallic",metal)
-  # }
-
-  #-------------------------------------------------------------------------
+   #-------------------------------------------------------------------------
   # add the expert lists
   #-------------------------------------------------------------------------
   file = paste0(dir,"expert classes master.xlsx")
@@ -369,14 +338,21 @@ use.classes <- function() {
   #-------------------------------------------------------------------------
   # add the classyfire classes
   #-------------------------------------------------------------------------
+  exclude = expert.override$class
   for(i in 1:nrow(res)) {
     dtxsid = res[i,"dtxsid"]
-    if(is.na(res[i,"class_type"])) {
-      if(!is.na(res[i,"subclass"])) res[i,"chosen_class"] = res[i,"subclass"]
-      else if(!is.na(res[i,"class"])) res[i,"chosen_class"] = res[i,"class"]
-      else if(!is.na(res[i,"superclass"])) res[i,"chosen_class"] = res[i,"superclass"]
-      else if(!is.na(res[i,"kingdom"])) res[i,"chosen_class"] = res[i,"kingdom"]
-      if(!is.na(res[i,"chosen_class"]))  res[i,"class_type"] = "ClassyFire"
+    doit = F
+    if(is.na(res[i,"class_type"])) doit = T
+    else {
+      if(res[i,"class_type"]=="Expert" && !is.element(res[i,"chosen_class"],exclude)) doit = T
+    }
+    if(doit) {
+      doit2 = F
+      if(!is.na(res[i,"subclass"]))         {res[i,"chosen_class"] = res[i,"subclass"];doit2=T}
+      else if(!is.na(res[i,"class"]))       {res[i,"chosen_class"] = res[i,"class"];doit2=T}
+      else if(!is.na(res[i,"superclass"]))  {res[i,"chosen_class"] = res[i,"superclass"];doit2=T}
+      else if(!is.na(res[i,"kingdom"]))     {res[i,"chosen_class"] = res[i,"kingdom"];doit2=T}
+      if(!is.na(res[i,"chosen_class"]) && doit2) res[i,"class_type"] = "ClassyFire"
     }
   }
   res[is.na(res$class_type),"class_type"] = "Unclassed"
@@ -403,6 +379,6 @@ use.classes <- function() {
   res[res$chosen_class=="unclassified","chosen_class"] = "Unclassed"
   res[res$chosen_class=="Unclassed","chosen_class"] = "Unclassified"
 
-  file = "data/input/chemclass level 2.xlsx"
+  file = paste0("data/input/chemical classes ",Sys.Date(),".xlsx")
   write.xlsx(res,file)
 }
